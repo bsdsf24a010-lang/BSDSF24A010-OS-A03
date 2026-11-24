@@ -182,10 +182,12 @@ int handle_builtin(char** arglist) {
     else if (strcmp(arglist[0], "cd") == 0) {
         if (arglist[1] == NULL) {
             fprintf(stderr, "cd: missing directory argument\n");
+            return 1;
         } else if (chdir(arglist[1]) != 0) {
             perror("cd");
+            return 1;
         }
-        return 1;
+        return 0;
     }
     else if (strcmp(arglist[0], "help") == 0) {
         printf("Built-in commands:\n");
@@ -194,15 +196,15 @@ int handle_builtin(char** arglist) {
         printf("  help            - show this help message\n");
         printf("  history         - display command history\n");
         printf("  jobs            - list active background jobs\n");
-        return 1;
+        return 0;
     }
     else if (strcmp(arglist[0], "jobs") == 0) {
         print_jobs();
-        return 1;
+        return 0;
     }
     else if (strcmp(arglist[0], "history") == 0) {
         print_history();
-        return 1;
+        return 0;
     }
-    return 0;
+    return -1;
 }
