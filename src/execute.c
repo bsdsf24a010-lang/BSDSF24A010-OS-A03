@@ -44,5 +44,9 @@ int handle_builtin(char** arglist) {
         printf("Job control not yet implemented.\n");
         return 1;
     }
+    else if (strcmp(arglist[0], "history") == 0) {
+        print_history();
+        return 1;
+    }
     return 0;
 }

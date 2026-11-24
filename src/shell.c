@@ -60,3 +60,22 @@ char** tokenize(char* cmdline) {
     arglist[argnum] = NULL;
     return arglist;
 }
+
+char* history[HISTORY_SIZE];
+int history_count = 0;
+
+void add_to_history(const char* cmd) {
+    if (history_count == HISTORY_SIZE) {
+        free(history[0]);                       // drop the oldest command
+        for (int i = 1; i < HISTORY_SIZE; i++)  // shift everything down by one
+            history[i - 1] = history[i];
+        history_count--;
+    }
+    history[history_count++] = strdup(cmd);     // strdup = make a copy of the string
+}
+
+void print_history(void) {
+    for (int i = 0; i < history_count; i++) {
+        printf("%d  %s\n", i + 1, history[i]);
+    }
+}
