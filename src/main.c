@@ -1,10 +1,45 @@
 #include "shell.h"
 
+static void run_single_command(char* segment) {
+    while (*segment == ' ' || *segment == '\t') segment++;
+    size_t len = strlen(segment);
+    while (len > 0 && (segment[len - 1] == ' ' || segment[len - 1] == '\t')) {
+        segment[--len] = '\0';
+    }
+    if (len == 0) return;
+
+    int is_bg = 0;
+    if (segment[len - 1] == '&') {
+        is_bg = 1;
+        segment[--len] = '\0';
+        while (len > 0 && (segment[len - 1] == ' ' || segment[len - 1] == '\t')) {
+            segment[--len] = '\0';
+        }
+    }
+    if (len == 0) return;
+
+    char* raw_copy = strdup(segment);
+    char** arglist = tokenize(segment);
+    if (arglist != NULL) {
+        if (handle_builtin(arglist) == 0) {
+            execute_bg(arglist, is_bg, raw_copy);
+        }
+        for (int i = 0; arglist[i] != NULL; i++) {
+            free(arglist[i]);
+        }
+        free(arglist);
+    }
+    free(raw_copy);
+}
+
 int main() {
     char* cmdline;
-    char** arglist;
 
-    while ((cmdline = readline(PROMPT)) != NULL) {
+    while (1) {
+        reap_zombies();
+        cmdline = readline(PROMPT);
+        if (cmdline == NULL) break;
+
         char* p = cmdline;
         while (*p == ' ' || *p == '\t') p++;
         if (*p == '\0') {
@@ -29,14 +64,21 @@ int main() {
         add_history(cmdline);
         add_to_history(cmdline);
 
-        if ((arglist = tokenize(cmdline)) != NULL) {
-            if (handle_builtin(arglist) == 0) execute(arglist);
-
-            for (int i = 0; arglist[i] != NULL; i++) {
-                free(arglist[i]);
+        char* seg_start = cmdline;
+        char quote = 0;
+        for (char* cur = cmdline; ; cur++) {
+            if (*cur == '"' || *cur == '\'') {
+                if (quote == 0) quote = *cur;
+                else if (quote == *cur) quote = 0;
+            } else if ((*cur == ';' && quote == 0) || *cur == '\0') {
+                char saved = *cur;
+                *cur = '\0';
+                run_single_command(seg_start);
+                if (saved == '\0') break;
+                seg_start = cur + 1;
             }
-            free(arglist);
         }
+
         free(cmdline);
     }
 

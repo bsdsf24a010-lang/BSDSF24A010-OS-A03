@@ -30,4 +30,8 @@ void print_history(void);
 #include <readline/readline.h>
 #include <readline/history.h>
 
+void reap_zombies(void);
+void print_jobs(void);
+int execute_bg(char* arglist[], int is_bg, const char* raw_cmd);
+
 #endif // SHELL_H

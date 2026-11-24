@@ -1,6 +1,61 @@
 #include "shell.h"
 #include <fcntl.h>
 
+#define MAX_JOBS 64
+
+typedef struct {
+    int id;
+    pid_t pid;
+    char cmd[MAX_LEN];
+    int active;
+} BgJob;
+
+static BgJob job_list[MAX_JOBS];
+static int next_job_id = 1;
+
+static void add_job(pid_t pid, const char* cmd) {
+    for (int i = 0; i < MAX_JOBS; i++) {
+        if (!job_list[i].active) {
+            job_list[i].id = next_job_id++;
+            job_list[i].pid = pid;
+            strncpy(job_list[i].cmd, cmd ? cmd : "", MAX_LEN - 1);
+            job_list[i].cmd[MAX_LEN - 1] = '\0';
+            job_list[i].active = 1;
+            printf("[%d] %d\n", job_list[i].id, pid);
+            return;
+        }
+    }
+    fprintf(stderr, "Maximum background jobs reached.\n");
+}
+
+void reap_zombies(void) {
+    int status;
+    pid_t pid;
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        for (int i = 0; i < MAX_JOBS; i++) {
+            if (job_list[i].active && job_list[i].pid == pid) {
+                printf("[%d] Done    %s\n", job_list[i].id, job_list[i].cmd);
+                job_list[i].active = 0;
+                break;
+            }
+        }
+    }
+}
+
+void print_jobs(void) {
+    reap_zombies();
+    int found = 0;
+    for (int i = 0; i < MAX_JOBS; i++) {
+        if (job_list[i].active) {
+            printf("[%d] %d Running    %s\n", job_list[i].id, job_list[i].pid, job_list[i].cmd);
+            found = 1;
+        }
+    }
+    if (!found) {
+        printf("No active background jobs.\n");
+    }
+}
+
 static void setup_redirection_and_exec(char** cmd_args) {
     char* exec_args[MAXARGS + 1];
     int j = 0;
@@ -45,7 +100,7 @@ static void setup_redirection_and_exec(char** cmd_args) {
     exit(1);
 }
 
-int execute(char* arglist[]) {
+int execute_bg(char* arglist[], int is_bg, const char* raw_cmd) {
     char* work[MAXARGS + 1];
     char** cmds[MAXARGS];
     int num_cmds = 0;
@@ -72,7 +127,7 @@ int execute(char* arglist[]) {
         if (i < num_cmds - 1) {
             if (pipe(pipefd) < 0) {
                 perror("pipe");
-                return -1;
+                return 1;
             }
         }
 
@@ -103,11 +158,20 @@ int execute(char* arglist[]) {
         }
     }
 
-    int status;
+    if (is_bg) {
+        add_job(pids[num_cmds - 1], raw_cmd);
+        return 0;
+    }
+
+    int status = 0;
     for (int i = 0; i < num_cmds; i++) {
         waitpid(pids[i], &status, 0);
     }
-    return 0;
+    return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
+}
+
+int execute(char* arglist[]) {
+    return execute_bg(arglist, 0, arglist[0]);
 }
 
 int handle_builtin(char** arglist) {
@@ -128,11 +192,12 @@ int handle_builtin(char** arglist) {
         printf("  cd <directory>  - change the current directory\n");
         printf("  exit            - exit the shell\n");
         printf("  help            - show this help message\n");
-        printf("  jobs            - list background jobs (not yet implemented)\n");
+        printf("  history         - display command history\n");
+        printf("  jobs            - list active background jobs\n");
         return 1;
     }
     else if (strcmp(arglist[0], "jobs") == 0) {
-        printf("Job control not yet implemented.\n");
+        print_jobs();
         return 1;
     }
     else if (strcmp(arglist[0], "history") == 0) {
