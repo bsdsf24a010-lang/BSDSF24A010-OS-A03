@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -Iinclude
-LDFLAGS =
+LDFLAGS = -lreadline
 
 OBJ = obj/main.o obj/shell.o obj/execute.o
 TARGET = bin/myshell

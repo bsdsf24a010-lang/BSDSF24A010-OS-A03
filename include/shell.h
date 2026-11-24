@@ -27,4 +27,7 @@ extern int history_count;
 void add_to_history(const char* cmd);
 void print_history(void);
 
+#include <readline/readline.h>
+#include <readline/history.h>
+
 #endif // SHELL_H

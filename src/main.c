@@ -4,7 +4,7 @@ int main() {
     char* cmdline;
     char** arglist;
 
-    while ((cmdline = read_cmd(PROMPT, stdin)) != NULL) {
+    while ((cmdline = readline(PROMPT)) != NULL) {
         char* p = cmdline;
         while (*p == ' ' || *p == '\t') p++;
         if (*p == '\0') {
@@ -26,6 +26,7 @@ int main() {
             printf("%s\n", cmdline);
         }
 
+        add_history(cmdline);
         add_to_history(cmdline);
 
         if ((arglist = tokenize(cmdline)) != NULL) {
