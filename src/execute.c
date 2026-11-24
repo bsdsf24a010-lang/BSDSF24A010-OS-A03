@@ -202,6 +202,10 @@ int handle_builtin(char** arglist) {
         print_jobs();
         return 0;
     }
+    else if (strcmp(arglist[0], "set") == 0) {
+        print_shell_vars();
+        return 0;
+    }
     else if (strcmp(arglist[0], "history") == 0) {
         print_history();
         return 0;

@@ -9,23 +9,63 @@ static char* trim_ws(char* s) {
     return s;
 }
 
+static int is_valid_var_name(const char* s, size_t len) {
+    if (len == 0) return 0;
+    if (!((s[0] >= 'A' && s[0] <= 'Z') || (s[0] >= 'a' && s[0] <= 'z') || s[0] == '_')) return 0;
+    for (size_t i = 1; i < len; i++) {
+        if (!((s[i] >= 'A' && s[i] <= 'Z') || (s[i] >= 'a' && s[i] <= 'z') ||
+              (s[i] >= '0' && s[i] <= '9') || s[i] == '_')) return 0;
+    }
+    return 1;
+}
+
 static int run_single_command(char* segment) {
     segment = trim_ws(segment);
-    size_t len = strlen(segment);
-    if (len == 0) return 0;
+    if (*segment == '\0') return 0;
+
+    char* expanded = expand_vars(segment);
+    char* cmd = trim_ws(expanded);
+    size_t len = strlen(cmd);
+    if (len == 0) {
+        free(expanded);
+        return 0;
+    }
+
+    char* eq = strchr(cmd, '=');
+    if (eq != NULL && is_valid_var_name(cmd, (size_t)(eq - cmd))) {
+        char var_name[256];
+        size_t nlen = (size_t)(eq - cmd);
+        if (nlen >= sizeof(var_name)) nlen = sizeof(var_name) - 1;
+        strncpy(var_name, cmd, nlen);
+        var_name[nlen] = '\0';
+
+        char* val = eq + 1;
+        size_t vlen = strlen(val);
+        if (vlen >= 2 && ((val[0] == '"' && val[vlen - 1] == '"') ||
+                          (val[0] == '\'' && val[vlen - 1] == '\''))) {
+            val[vlen - 1] = '\0';
+            val++;
+        }
+        set_shell_var(var_name, val);
+        free(expanded);
+        return 0;
+    }
 
     int is_bg = 0;
-    if (segment[len - 1] == '&') {
+    if (cmd[len - 1] == '&') {
         is_bg = 1;
-        segment[--len] = '\0';
-        segment = trim_ws(segment);
-        len = strlen(segment);
+        cmd[--len] = '\0';
+        cmd = trim_ws(cmd);
+        len = strlen(cmd);
     }
-    if (len == 0) return 0;
+    if (len == 0) {
+        free(expanded);
+        return 0;
+    }
 
     int status = 0;
-    char* raw_copy = strdup(segment);
-    char** arglist = tokenize(segment);
+    char* raw_copy = strdup(cmd);
+    char** arglist = tokenize(cmd);
     if (arglist != NULL) {
         int b = handle_builtin(arglist);
         if (b == -1) {
@@ -39,6 +79,7 @@ static int run_single_command(char* segment) {
         free(arglist);
     }
     free(raw_copy);
+    free(expanded);
     return status;
 }
 

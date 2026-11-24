@@ -34,4 +34,9 @@ void reap_zombies(void);
 void print_jobs(void);
 int execute_bg(char* arglist[], int is_bg, const char* raw_cmd);
 
+void set_shell_var(const char* name, const char* value);
+const char* get_shell_var(const char* name);
+void print_shell_vars(void);
+char* expand_vars(const char* input);
+
 #endif // SHELL_H

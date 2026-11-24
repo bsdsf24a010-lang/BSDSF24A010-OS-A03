@@ -97,3 +97,101 @@ void print_history(void) {
         printf("%d  %s\n", i + 1, history[i]);
     }
 }
+
+typedef struct ShellVar {
+    char* name;
+    char* value;
+    struct ShellVar* next;
+} ShellVar;
+
+static ShellVar* var_head = NULL;
+
+void set_shell_var(const char* name, const char* value) {
+    for (ShellVar* cur = var_head; cur != NULL; cur = cur->next) {
+        if (strcmp(cur->name, name) == 0) {
+            free(cur->value);
+            cur->value = strdup(value);
+            return;
+        }
+    }
+    ShellVar* node = (ShellVar*)malloc(sizeof(ShellVar));
+    node->name = strdup(name);
+    node->value = strdup(value);
+    node->next = var_head;
+    var_head = node;
+}
+
+const char* get_shell_var(const char* name) {
+    for (ShellVar* cur = var_head; cur != NULL; cur = cur->next) {
+        if (strcmp(cur->name, name) == 0) {
+            return cur->value;
+        }
+    }
+    const char* env_val = getenv(name);
+    return env_val ? env_val : "";
+}
+
+void print_shell_vars(void) {
+    for (ShellVar* cur = var_head; cur != NULL; cur = cur->next) {
+        printf("%s=%s\n", cur->name, cur->value);
+    }
+}
+
+char* expand_vars(const char* input) {
+    size_t cap = strlen(input) * 2 + 64;
+    char* out = (char*)malloc(cap);
+    size_t out_len = 0;
+    char quote = 0;
+
+    for (size_t i = 0; input[i] != '\0'; ) {
+        if (input[i] == '\'' || input[i] == '"') {
+            if (quote == 0) quote = input[i];
+            else if (quote == input[i]) quote = 0;
+            if (out_len + 2 >= cap) { cap *= 2; out = realloc(out, cap); }
+            out[out_len++] = input[i++];
+            continue;
+        }
+
+        if (input[i] == '$' && quote != '\'') {
+            size_t start = i + 1;
+            int braced = 0;
+            if (input[start] == '{') {
+                braced = 1;
+                start++;
+            }
+            if ((input[start] >= 'A' && input[start] <= 'Z') ||
+                (input[start] >= 'a' && input[start] <= 'z') ||
+                input[start] == '_') {
+                size_t end = start;
+                while ((input[end] >= 'A' && input[end] <= 'Z') ||
+                       (input[end] >= 'a' && input[end] <= 'z') ||
+                       (input[end] >= '0' && input[end] <= '9') ||
+                       input[end] == '_') {
+                    end++;
+                }
+                if (!braced || input[end] == '}') {
+                    char var_name[256];
+                    size_t nlen = end - start;
+                    if (nlen >= sizeof(var_name)) nlen = sizeof(var_name) - 1;
+                    strncpy(var_name, input + start, nlen);
+                    var_name[nlen] = '\0';
+
+                    const char* val = get_shell_var(var_name);
+                    size_t vlen = strlen(val);
+                    while (out_len + vlen + 2 >= cap) { cap *= 2; out = realloc(out, cap); }
+                    memcpy(out + out_len, val, vlen);
+                    out_len += vlen;
+
+                    i = braced ? end + 1 : end;
+                    continue;
+                }
+            }
+        }
+
+        if (out_len + 2 >= cap) { cap *= 2; out = realloc(out, cap); }
+        out[out_len++] = input[i++];
+    }
+
+    out[out_len] = '\0';
+    return out;
+}
